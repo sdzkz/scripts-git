@@ -9,7 +9,11 @@ def print_calendar(year, month, highlight_today=True):
     cal = calendar.TextCalendar(calendar.SUNDAY)
     month_days = cal.monthdayscalendar(year, month)
     
-    print(f"{calendar.month_name[month]} {year}".center(28))
+    # Calculate grid width (7 columns * 4 chars each + 8 borders)
+    grid_width = 7 * 4 + 8
+    header = f"{calendar.month_name[month]} {year}"
+    print(header.center(grid_width))
+    
     print("┌────┬────┬────┬────┬────┬────┬────┐")
     print("│ Su │ Mo │ Tu │ We │ Th │ Fr │ Sa │")
     print("├────┼────┼────┼────┼────┼────┼────┤")
