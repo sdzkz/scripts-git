@@ -1,7 +1,7 @@
 #!/usr/bin/env zsh
 
 MODES_DIR="llm_cli/modes"
-CURRENT_MODE=$(readlink system_message.txt | xargs basename 2>/dev/null)
+CURRENT_MODE=$(readlink mode | xargs basename 2>/dev/null)
 echo ""
 
 [[ ! -d "$MODES_DIR" ]] && {
@@ -53,7 +53,7 @@ MODE_FILE="$MODES_DIR/$1"
     exit 1
 }
 
-ln -sf "$MODE_FILE" system_message.txt
-echo "Switched system_message.txt → $1"
+ln -sf "$MODE_FILE" mode
+echo "mode → $1"
 echo ""
 
