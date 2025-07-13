@@ -17,14 +17,18 @@ UPPERCASE_NAME=${(U)NAME}
 CAPITALIZED_NAME="${(C)${NAME:0:1}}${NAME:1}"  
 DB_PATH="$DB_DIR/$LOWERCASE_NAME/${LOWERCASE_NAME}_exchanges.db"
 RESPONSE_FILE="${CAPITALIZED_NAME}_response.md"
-VENV_NAME="${LOWERCASE_NAME}-env" # TODO replace _ with -
+VENV_NAME=$(echo "${LOWERCASE_NAME}" | sed "s/_/-/")-env
 
-# Create directory structure first
 mkdir -p "$DB_DIR/$LOWERCASE_NAME" || exit 1
 mkdir -p scripts || exit 1
 
-# Generate file contents
-GITIGNORE_CONTENT=".env\n__pycache__/\n$VENV_NAME/\nprompt.txt\n$RESPONSE_FILE"
+GITIGNORE_CONTENT=".env
+__pycache__/
+${VENV_NAME}/
+mode
+prompt.txt
+${RESPONSE_FILE}
+"
 
 CONFIG_CONTENT="#!/usr/bin/env python3
 
@@ -69,11 +73,8 @@ echo $CONFIG_CONTENT > config.py
 echo $INITDB_CONTENT > init_db.py
 touch prompt.txt $RESPONSE_FILE
 
-# Setup environment
-python3 -m venv "$VENV_NAME" || exit 1
-source "${VENV_NAME}/bin/activate"
-pip install -r requirements.txt || exit 1
-deactivate
+~/Dev/scripts-git/mkvenv.sh "$VENV_NAME" || exit 1
+./$VENV_NAME/bin/python -m pip install -r requirements.txt || exit 1
 
 # Initialize database
 chmod +x init_db.py
@@ -84,11 +85,12 @@ ln -sf "$DB_PATH" project.db
 if [[ -f "../scripts-git/switch_cli.zsh" ]]; then
   cp ../scripts-git/switch_cli.zsh . 
   ./switch_cli.zsh
-  mode blank # TODO does not work
+  ~/Dev/scripts-git/mode.zsh blank
 fi
 
 if [[ -f "../deepseek-git/scripts/submit_prompt.py" ]]; then
   cp "../deepseek-git/scripts/submit_prompt.py" scripts/
+  # TODO define db, api_key, base_url, models, response_file
 fi
 
 echo "Installation complete for $CAPITALIZED_NAME!"
