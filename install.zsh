@@ -16,7 +16,7 @@ UPPERCASE_NAME=${(U)NAME}
 # Capitalize first letter only
 CAPITALIZED_NAME="${(C)${NAME:0:1}}${NAME:1}"  
 DB_PATH="$DB_DIR/$LOWERCASE_NAME/${LOWERCASE_NAME}_exchanges.db"
-RESPONSE_FILE="${CAPITALIZED_NAME}_response.md"
+RESPONSE_FILE="${CAPITALIZED_NAME}\ Response.md"
 VENV_NAME=$(echo "${LOWERCASE_NAME}" | sed "s/_/-/")-env
 
 mkdir -p "$DB_DIR/$LOWERCASE_NAME" || exit 1
@@ -24,10 +24,11 @@ mkdir -p scripts || exit 1
 
 GITIGNORE_CONTENT=".env
 __pycache__/
-${VENV_NAME}/
-mode
-prompt.txt
-${RESPONSE_FILE}
+/${VENV_NAME}/
+/models.txt
+/mode
+/prompt.txt
+/${RESPONSE_FILE}
 "
 
 CONFIG_CONTENT="#!/usr/bin/env python3
@@ -37,8 +38,8 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-${UPPERCASE_NAME}_API_KEY = os.getenv('${UPPERCASE_NAME}_API_KEY')
-${UPPERCASE_NAME}_EXCHANGES_DB_PATH = os.getenv('${UPPERCASE_NAME}_EXCHANGES_DB_PATH')
+API_KEY = ${UPPERCASE_NAME}_API_KEY = os.getenv('${UPPERCASE_NAME}_API_KEY')
+EXCHANGES_DB_PATH = ${UPPERCASE_NAME}_EXCHANGES_DB_PATH = os.getenv('${UPPERCASE_NAME}_EXCHANGES_DB_PATH')
 "
 
 INITDB_CONTENT="#!/usr/bin/env python3
@@ -71,7 +72,7 @@ echo "${UPPERCASE_NAME}_EXCHANGES_DB_PATH=$DB_PATH" >> .env
 echo -e $GITIGNORE_CONTENT > .gitignore
 echo $CONFIG_CONTENT > config.py
 echo $INITDB_CONTENT > init_db.py
-touch prompt.txt $RESPONSE_FILE
+touch prompt.txt $RESPONSE_FILE models.txt
 
 ~/Dev/scripts-git/mkvenv.sh "$VENV_NAME" || exit 1
 ./$VENV_NAME/bin/python -m pip install -r requirements.txt || exit 1
@@ -90,7 +91,7 @@ fi
 
 if [[ -f "../deepseek-git/scripts/submit_prompt.py" ]]; then
   cp "../deepseek-git/scripts/submit_prompt.py" scripts/
-  # TODO define db, api_key, base_url, models, response_file
+  # TODO define base_url, models, response_file
 fi
 
 echo "Installation complete for $CAPITALIZED_NAME!"
