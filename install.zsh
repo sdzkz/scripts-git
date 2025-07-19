@@ -31,7 +31,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-API_KEY = os.getenv('YOUTUBE_API_KEY')
+API_KEY = os.getenv('API_KEY')
 DB_PATH = os.getenv('DB_PATH')
 "
 
@@ -44,7 +44,7 @@ db = config.DB_PATH
 
 conn = sqlite3.connect(db)
 conn.execute('''
-    CREATE TABLE IF NOT EXISTS youtube_videos (
+    CREATE TABLE IF NOT EXISTS chess_games (
         id INTEGER PRIMARY KEY,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         url TEXT NOT NULL
