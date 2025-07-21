@@ -16,7 +16,7 @@ UPPERCASE_NAME=${(U)NAME}
 # Capitalize first letter only
 CAPITALIZED_NAME="${(C)${NAME:0:1}}${NAME:1}"  
 DB_PATH="$DB_DIR/$LOWERCASE_NAME/${LOWERCASE_NAME}_exchanges.db"
-RESPONSE_FILE="${CAPITALIZED_NAME}\ Response.md"
+RESPONSE_FILE="${CAPITALIZED_NAME} Response.md"
 VENV_NAME=$(echo "${LOWERCASE_NAME}" | sed "s/_/-/")-env
 
 mkdir -p "$DB_DIR/$LOWERCASE_NAME" || exit 1
@@ -25,6 +25,7 @@ mkdir -p scripts || exit 1
 GITIGNORE_CONTENT=".env
 __pycache__/
 /${VENV_NAME}/
+/code
 /models.txt
 /mode
 /prompt.txt
