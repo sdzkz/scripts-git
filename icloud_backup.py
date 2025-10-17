@@ -8,6 +8,7 @@ ICLOUD_BACKUP_DIR = "/Users/billp/Library/Mobile Documents/com~apple~CloudDocs/2
 PATHS_TO_BACKUP = [
     "/Users/billp/.config",
     "/Users/billp/.gitconfig",
+    "/Users/billp/.hammerspoon",
     "/Users/billp/.local",
     "/Users/billp/.python_history",
     "/Users/billp/.sqlite_history",
