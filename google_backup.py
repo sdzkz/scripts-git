@@ -11,9 +11,9 @@ drive_root = r"M1\ Backups/"
 speed_flags = "--transfers 32 --checkers 16 --fast-list --buffer-size 64M"
 
 directories_to_sync = {
-    "/Users/billp/Comics/":"Comics/",
     "/Users/billp/Desktop/":"Desktop/",
     "/Users/billp/Dev/":"Dev/",
+    r"/Users/billp/Long\ Term\ Storage/":r"Long\ Term\ Storage/",
     "/Users/billp/Videos/":"Videos/"
 }
 
