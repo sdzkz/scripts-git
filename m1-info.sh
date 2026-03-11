@@ -62,3 +62,22 @@ command -v ffmpeg &>/dev/null && echo "- ffmpeg: $(ffmpeg -version 2>&1 | head -
 command -v ssh &>/dev/null && echo "- SSH: $(ssh -V 2>&1 | awk '{print $1}' | cut -d'_' -f2 | tr -d ',')"
 command -v curl &>/dev/null && echo "- curl: $(curl --version | head -1 | awk '{print $2}')"
 command -v wget &>/dev/null && echo "- wget: $(wget --version | head -1 | awk '{print $3}')"
+
+echo ""
+echo "## Dotfiles"
+echo ""
+if [[ -d "$HOME/dotfiles" ]]; then
+    find "$HOME/dotfiles" -type f -not -path "*/.git/*" | sort | while read -r file; do
+        basename=$(basename "$file")
+        if [[ "$basename" == ".claude.json" || "$basename" == "rc.conf" || "$basename" == "rifle.conf" ]]; then
+            continue
+        fi
+        echo "### ${file#$HOME/dotfiles/}"
+        echo '```'
+        cat "$file"
+        echo '```'
+        echo ""
+    done
+else
+    echo "(~/dotfiles not found)"
+fi
