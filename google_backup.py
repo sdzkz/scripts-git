@@ -25,7 +25,8 @@ excluded_patterns = {
     "**/__pycache__/**",
     "venv/**",
     "*-env/**",
-    "Work/Misc/Archive/**"
+    "Work/Misc/Archive/**",
+    "ladybird/**"
 }
 
 exclude_clause = " ".join(f'--exclude "{pattern}"' for pattern in excluded_patterns)  
