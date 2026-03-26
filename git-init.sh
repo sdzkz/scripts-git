@@ -5,10 +5,10 @@ if [ ! -d ".git" ]; then
   git init
 fi
 
-echo "Which account?"
-echo "1) $PERSONAL_GIT_NAME (personal)"
-echo "2) $WORK_GIT_NAME (work)"
-read "choice?> "
+echo "\nWhich?"
+echo "1 - $PERSONAL_GIT_NAME"
+echo "2 - $WORK_GIT_NAME"
+read "choice?\n: "
 
 case $choice in
   1)
