@@ -26,6 +26,7 @@ excluded_patterns = {
     "venv/**",
     "*-env/**",
     "Work/Misc/Archive/**",
+    "Misc/lg-aristo/podcasts/library/**",
     "ladybird/**"
 }
 
