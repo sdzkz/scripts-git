@@ -27,7 +27,9 @@ excluded_patterns = {
     "*-env/**",
     "Work/Misc/Archive/**",
     "Misc/lg-aristo/podcasts/library/**",
-    "ladybird/**"
+    "Misc/lg-aristo/youtubes/library/**",
+    "ladybird/**",
+    "Misc/claude-code-leaked/**"
 }
 
 exclude_clause = " ".join(f'--exclude "{pattern}"' for pattern in excluded_patterns)  
