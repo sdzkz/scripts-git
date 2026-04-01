@@ -12,8 +12,20 @@ done
 
 if [[ " $* " == *" --existing "* ]]; then
   gh auth switch --user "$gh_user"
+  all_repos=("${(@f)$(gh repo list "$gh_user" --limit 1000 --json name -q '[.[].name] | sort | .[]')}")
+  read "search?Search: "
+  repos=()
+  for repo in "${all_repos[@]}"; do
+    if [[ -z "$search" || "${repo:l}" == *"${search:l}"* ]]; then
+      repos+=("$repo")
+    fi
+  done
+
   echo "\nRepos:"
-  repos=("${(@f)$(gh repo list "$gh_user" --limit 1000 --json name -q '[.[].name] | sort | .[]')}")
+  if [[ ${#repos[@]} -eq 0 ]]; then
+    echo "  No repos matched \"$search\""
+    exit 1
+  fi
   for i in {1..${#repos[@]}}; do
     echo "  $i) ${repos[$i]}"
   done
