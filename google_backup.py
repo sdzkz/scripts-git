@@ -31,7 +31,8 @@ excluded_patterns = {
     "ladybird/**",
     "Misc/claude-code-leaked/**",
     "Misc/fix-audio/**",
-    "view-exif/**"
+    "view-exif/**",
+    "Qwen2.5-1.5B-Instruct/**"
 }
 
 exclude_clause = " ".join(f'--exclude "{pattern}"' for pattern in excluded_patterns)  
