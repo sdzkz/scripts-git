@@ -75,7 +75,7 @@ echo $CONFIG_CONTENT > config.py
 echo $INITDB_CONTENT > init_db.py
 touch prompt.txt $RESPONSE_FILE models.txt
 
-~/Dev/scripts-git/mkvenv.sh "$VENV_NAME" || exit 1
+"${0:A:h}/mkvenv.zsh" "$VENV_NAME" || exit 1
 ./$VENV_NAME/bin/python -m pip install -r requirements.txt || exit 1
 
 # Initialize database
