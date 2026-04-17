@@ -28,10 +28,10 @@ fi
 
 for i in {1..${#apps[@]}}; do
     display_name=$(print -r -- "${apps[$i]}" | perl -pe 's/^([[:alpha:]])/\U$1/')
-    print "$i. $display_name"
+    print "$i - $display_name"
 done
 
-print -n "\nEnter app number to quit: "
+print -n "\n: "
 read selection
 
 if [[ ! "$selection" =~ ^[0-9]+$ ]]; then
@@ -52,4 +52,4 @@ on run argv
 end run
 APPLESCRIPT
 
-print "Quit: $app_name"
+print -P -- "\n$app_name %F{cyan}Quit%f\n"
