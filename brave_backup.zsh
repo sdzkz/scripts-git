@@ -6,8 +6,9 @@
 set -euo pipefail
 
 # Configuration
-BRAVE_DEFAULT_PATH="/Users/$USER/Library/Application Support/BraveSoftware/Brave-Browser/Default"
-BACKUP_DIR="$HOME/Dev/backups/brave_backup_$(date +%Y%m%d_%H%M%S)"
+BRAVE_USER_DATA_PATH="/Users/$USER/Library/Application Support/BraveSoftware/Brave-Browser"
+BACKUP_ROOT="$HOME/Dev/backups/brave"
+BACKUP_DIR="$BACKUP_ROOT/brave_backup_$(date +%Y%m%d_%H%M%S)"
 DRY_RUN=false
 
 # Parse arguments
@@ -30,39 +31,68 @@ BACKUP_ITEMS=(
 )
 
 # Check if Brave directory exists
-if [[ ! -d "$BRAVE_DEFAULT_PATH" ]]; then
-    echo "❌ Brave browser directory not found: $BRAVE_DEFAULT_PATH" >&2
+if [[ ! -d "$BRAVE_USER_DATA_PATH" ]]; then
+    echo "ERROR: Brave browser directory not found: $BRAVE_USER_DATA_PATH" >&2
     exit 1
 fi
 
-echo "🦁 Brave Browser Backup Script"
-echo "Source: $BRAVE_DEFAULT_PATH"
+# Collect all regular Brave profile directories
+PROFILE_DIRS=()
+
+if [[ -d "$BRAVE_USER_DATA_PATH/Default" ]]; then
+    PROFILE_DIRS+=("$BRAVE_USER_DATA_PATH/Default")
+fi
+
+for profile_dir in "$BRAVE_USER_DATA_PATH"/Profile\ *(N); do
+    [[ -d "$profile_dir" ]] && PROFILE_DIRS+=("$profile_dir")
+done
+
+if (( ${#PROFILE_DIRS[@]} == 0 )); then
+    echo "ERROR: No Brave profiles found under: $BRAVE_USER_DATA_PATH" >&2
+    exit 1
+fi
+
+echo "Brave Browser Backup Script"
+echo "Source: $BRAVE_USER_DATA_PATH"
+
+if pgrep -xq "Brave Browser" 2>/dev/null; then
+    echo "WARNING: Brave appears to be running. Quit Brave first for the most consistent backup of SQLite files."
+fi
+
+echo "Profiles:"
+for profile_dir in "${PROFILE_DIRS[@]}"; do
+    echo "  - $(basename "$profile_dir")"
+done
 
 if $DRY_RUN; then
-    echo -e "\n🔍 DRY RUN - Calculating backup size..."
+    echo -e "\nDRY RUN - Calculating backup size..."
     echo "Backup destination: $BACKUP_DIR"
-    echo -e "\nItems to backup:"
     
     total_size=0
     
-    for item in "${BACKUP_ITEMS[@]}"; do
-        item_path="$BRAVE_DEFAULT_PATH/$item"
-        if [[ -e "$item_path" ]]; then
-            # Use consistent byte calculation method
-            if [[ -d "$item_path" ]]; then
-                # Calculate directory size using find + stat
-                size_bytes=$(find "$item_path" -type f -exec stat -f%z {} \; 2>/dev/null | awk '{s+=$1} END {print s}')
-                size_human=$(du -sh "$item_path" | awk '{print $1}')
-                echo "  📁 $item/ - $size_human"
+    for profile_dir in "${PROFILE_DIRS[@]}"; do
+        profile_name=$(basename "$profile_dir")
+        echo -e "\nItems to backup for $profile_name:"
+
+        for item in "${BACKUP_ITEMS[@]}"; do
+            item_path="$profile_dir/$item"
+            if [[ -e "$item_path" ]]; then
+                # Use consistent byte calculation method
+                if [[ -d "$item_path" ]]; then
+                    # Calculate directory size using find + stat
+                    size_bytes=$(find "$item_path" -type f -exec stat -f%z {} \; 2>/dev/null | awk '{s+=$1} END {print s}')
+                    size_human=$(du -sh "$item_path" | awk '{print $1}')
+                    echo "  DIR  $item/ - $size_human"
+                else
+                    size_bytes=$(stat -f%z "$item_path" 2>/dev/null || echo 0)
+                    size_human=$(du -sh "$item_path" | awk '{print $1}')
+                    echo "  FILE $item - $size_human"
+                fi
+                total_size=$((total_size + size_bytes))
             else
-                size_bytes=$(stat -f%z "$item_path" 2>/dev/null || echo 0)
-                size_human=$(du -sh "$item_path" | awk '{print $1}')
-                echo "  📄 $item - $size_human"
+                echo "  WARN $item - not found"
             fi
-            total_size=$((total_size + size_bytes))
-        else
-            echo "  ⚠️  $item - not found"
-        fi
+        done
     done
     
     # Convert total size to human readable
@@ -76,32 +106,39 @@ if $DRY_RUN; then
         total_human="${total_size}B"
     fi
     
-    echo -e "\n📊 Total backup size: $total_human"
+    echo -e "\nTotal backup size: $total_human"
     echo -e "\nTo perform the actual backup, run without --dry-run"
     
 else
     echo "Backup destination: $BACKUP_DIR"
     mkdir -p "$BACKUP_DIR"
-    echo -e "\n📦 Creating backup..."
+    echo -e "\nCreating backup..."
     
     backed_up=0
-    for item in "${BACKUP_ITEMS[@]}"; do
-        item_path="$BRAVE_DEFAULT_PATH/$item"
-        dest_path="$BACKUP_DIR/$item"
-        
-        if [[ -e "$item_path" ]]; then
-            if [[ -d "$item_path" ]]; then
-                cp -R "$item_path" "$dest_path"
+    for profile_dir in "${PROFILE_DIRS[@]}"; do
+        profile_name=$(basename "$profile_dir")
+        profile_backup_dir="$BACKUP_DIR/$profile_name"
+        mkdir -p "$profile_backup_dir"
+
+        echo -e "\n[$profile_name]"
+
+        for item in "${BACKUP_ITEMS[@]}"; do
+            item_path="$profile_dir/$item"
+            dest_path="$profile_backup_dir/$item"
+            
+            if [[ -e "$item_path" ]]; then
+                if [[ -d "$item_path" ]]; then
+                    cp -R "$item_path" "$dest_path"
+                else
+                    cp "$item_path" "$dest_path"
+                fi
+                (( ++backed_up ))
+                echo "  OK   $item"
             else
-                cp "$item_path" "$dest_path"
+                echo "  WARN $item - not found, skipping"
             fi
-            (( backed_up++ ))
-            echo "  ✅ $item"
-        else
-            echo "  ⚠️  $item - not found, skipping"
-        fi
+        done
     done
     
-    echo -e "\n✅ Backup completed! $backed_up items backed up to: $BACKUP_DIR"
+    echo -e "\nBackup completed. $backed_up items backed up to: $BACKUP_DIR"
 fi
-
