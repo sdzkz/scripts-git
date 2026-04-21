@@ -22,6 +22,7 @@ excluded_patterns = {
     ".git/**",
     ".history/**",
     ".idea/**",
+    ".git.*/**",
     "**/__pycache__/**",
     "venv/**",
     "*-env/**",
