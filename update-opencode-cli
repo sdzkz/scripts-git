@@ -1,0 +1,104 @@
+#!/usr/bin/env zsh
+
+set -euo pipefail
+
+INSTALL_DIR="$HOME/.local/bin"
+BINARY="$INSTALL_DIR/opencode"
+BACKUP="$INSTALL_DIR/opencode.bak"
+REPO="anomalyco/opencode"
+
+normalize_version() {
+  sed -E 's/^[^0-9]*//'
+}
+
+require_cmd() {
+  if ! command -v "$1" >/dev/null 2>&1; then
+    echo "Missing required command: $1" >&2
+    exit 1
+  fi
+}
+
+detect_asset_arch() {
+  case "$(uname -m)" in
+    arm64|aarch64)
+      print -r -- "darwin-arm64"
+      ;;
+    x86_64|amd64)
+      print -r -- "darwin-x64"
+      ;;
+    *)
+      echo "Unsupported architecture: $(uname -m)" >&2
+      exit 1
+      ;;
+  esac
+}
+
+require_cmd curl
+require_cmd unzip
+mkdir -p "$INSTALL_DIR"
+
+if [[ "$(uname -s)" != "Darwin" ]]; then
+  echo "This updater is for macOS only" >&2
+  exit 1
+fi
+
+ARCH="$(detect_asset_arch)"
+
+# Get latest release tag from GitHub API
+latest_json=$(curl -fsSL "https://api.github.com/repos/${REPO}/releases/latest")
+latest_tag=$(print -r -- "$latest_json" | sed -nE 's/.*"tag_name"[[:space:]]*:[[:space:]]*"([^"]+)".*/\1/p' | head -1)
+
+if [[ -z "$latest_tag" ]]; then
+  echo "Could not determine the latest release tag" >&2
+  exit 1
+fi
+
+tmpdir=$(mktemp -d)
+trap 'rm -rf "$tmpdir"' EXIT
+
+asset="opencode-${ARCH}.zip"
+url="https://github.com/${REPO}/releases/download/${latest_tag}/${asset}"
+latest_version=$(print -r -- "$latest_tag" | normalize_version)
+
+# Get current version from the real installed binary, not a PATH wrapper.
+if [[ -x "$BINARY" ]]; then
+  current_raw=$("$BINARY" --version 2>/dev/null | head -1 || true)
+  current_version=$(print -r -- "$current_raw" | sed -E 's/.*([0-9]+\.[0-9]+\.[0-9]+).*/\1/')
+else
+  current_version="none"
+fi
+
+if [[ "$latest_version" == "$current_version" ]]; then
+  echo "Already on $latest_tag"
+  exit 0
+fi
+
+echo "Updating: ${current_version} -> ${latest_tag}"
+
+read -q "confirm?Install ${latest_tag}? [y/N] "
+echo
+if [[ "$confirm" != [Yy] ]]; then
+  echo "Update cancelled"
+  exit 0
+fi
+
+curl -fsSL -o "$tmpdir/$asset" "$url"
+unzip -q "$tmpdir/$asset" -d "$tmpdir/extract"
+
+extracted_binary=$(find "$tmpdir/extract" -type f -name opencode | head -1)
+if [[ -z "$extracted_binary" ]]; then
+  echo "Could not find opencode binary in $asset" >&2
+  exit 1
+fi
+
+tmp_binary=$(mktemp "$INSTALL_DIR/opencode.new.XXXXXX")
+cp "$extracted_binary" "$tmp_binary"
+chmod 755 "$tmp_binary"
+
+if [[ -e "$BINARY" ]]; then
+  cp -p "$BINARY" "$BACKUP"
+fi
+
+mv -f "$tmp_binary" "$BINARY"
+
+echo "Updated to $latest_tag"

@@ -25,6 +25,7 @@ excluded_patterns = {
     ".git.*/**",
     "**/__pycache__/**",
     "venv/**",
+    "brave/**",
     "*-env/**",
     "Work/Misc/Archive/**",
     "Misc/lg-aristo/podcasts/library/**",
