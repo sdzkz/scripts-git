@@ -1,0 +1,9 @@
+Generate a git commit message for the diff below. Follow this exact format:
+
+- First line: a short summary (50 chars or less ideally, 72 max)
+- Blank line
+- Then bullet points describing the changes (as many as needed)
+
+Return ONLY the commit message inside a single code block. No other text.
+
+Diff:
