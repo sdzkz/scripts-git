@@ -1,0 +1,139 @@
+#!/usr/bin/env zsh
+
+set -euo pipefail
+
+INSTALL_DIR="$HOME/.local/bin"
+BINARY="$INSTALL_DIR/restic"
+BACKUP="$INSTALL_DIR/restic.bak"
+REPO="restic/restic"
+
+normalize_version() {
+  sed -E 's/^[^0-9]*//'
+}
+
+require_cmd() {
+  if ! command -v "$1" >/dev/null 2>&1; then
+    echo "Missing required command: $1" >&2
+    exit 1
+  fi
+}
+
+detect_asset_platform() {
+  case "$(uname -s)" in
+    Darwin)
+      os="darwin"
+      ;;
+    Linux)
+      os="linux"
+      ;;
+    *)
+      echo "Unsupported OS: $(uname -s)" >&2
+      exit 1
+      ;;
+  esac
+
+  case "$(uname -m)" in
+    arm64|aarch64)
+      arch="arm64"
+      ;;
+    x86_64|amd64)
+      arch="amd64"
+      ;;
+    i386|i686)
+      arch="386"
+      ;;
+    armv6l|armv7l)
+      arch="arm"
+      ;;
+    *)
+      echo "Unsupported architecture: $(uname -m)" >&2
+      exit 1
+      ;;
+  esac
+
+  print -r -- "${os}_${arch}"
+}
+
+require_cmd curl
+require_cmd bunzip2
+require_cmd jq
+require_cmd shasum
+mkdir -p "$INSTALL_DIR"
+
+PLATFORM="$(detect_asset_platform)"
+
+# Get latest release tag from GitHub API
+latest_json=$(curl -fsSL "https://api.github.com/repos/${REPO}/releases/latest")
+latest_tag=$(print -r -- "$latest_json" | sed -nE 's/.*"tag_name"[[:space:]]*:[[:space:]]*"([^"]+)".*/\1/p' | head -1)
+
+if [[ -z "$latest_tag" ]]; then
+  echo "Could not determine the latest release tag" >&2
+  exit 1
+fi
+
+tmpdir=$(mktemp -d)
+trap 'rm -rf "$tmpdir"' EXIT
+
+latest_version=$(print -r -- "$latest_tag" | normalize_version)
+asset="restic_${latest_version}_${PLATFORM}.bz2"
+url="https://github.com/${REPO}/releases/download/${latest_tag}/${asset}"
+expected_digest=$(print -r -- "$latest_json" | jq -r --arg asset "$asset" '.assets[] | select(.name == $asset) | .digest // empty' | sed -E 's/^sha256://')
+
+if [[ -z "$expected_digest" ]]; then
+  echo "Could not determine the SHA-256 digest for $asset" >&2
+  exit 1
+fi
+
+# Get current version from the real installed binary, not a PATH wrapper.
+if [[ -x "$BINARY" ]]; then
+  current_raw=$("$BINARY" version 2>/dev/null | head -1 || true)
+  current_version=$(print -r -- "$current_raw" | sed -nE 's/^restic[[:space:]]+([0-9]+\.[0-9]+\.[0-9]+).*/\1/p')
+  current_version=${current_version:-unknown}
+else
+  current_version="none"
+fi
+
+if [[ "$latest_version" == "$current_version" ]]; then
+  echo "Already on $latest_tag"
+  exit 0
+fi
+
+echo "Updating: ${current_version} -> ${latest_tag}"
+
+printf "Install ${latest_tag}? [y/N] "
+if ! read -r confirm; then
+  echo
+  echo "Update cancelled"
+  exit 0
+fi
+
+if [[ "$confirm" != [Yy]* ]]; then
+  echo "Update cancelled"
+  exit 0
+fi
+
+curl -fsSL -o "$tmpdir/$asset" "$url"
+actual_digest=$(shasum -a 256 "$tmpdir/$asset" | awk '{print $1}')
+
+if [[ "$actual_digest" != "$expected_digest" ]]; then
+  echo "Checksum verification failed for $asset" >&2
+  echo "Expected: $expected_digest" >&2
+  echo "Actual:   $actual_digest" >&2
+  exit 1
+fi
+
+echo "Verified checksum: sha256:$actual_digest"
+bunzip2 -c "$tmpdir/$asset" > "$tmpdir/restic"
+chmod 755 "$tmpdir/restic"
+
+tmp_binary=$(mktemp "$INSTALL_DIR/restic.new.XXXXXX")
+cp "$tmpdir/restic" "$tmp_binary"
+chmod 755 "$tmp_binary"
+
+if [[ -e "$BINARY" ]]; then
+  cp -p "$BINARY" "$BACKUP"
+fi
+
+mv -f "$tmp_binary" "$BINARY"
+
+echo "Updated to $latest_tag"
