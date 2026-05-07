@@ -2,6 +2,48 @@
 
 gh_user=$(git config user.name)
 
+choose_owner() {
+  local account="$1"
+  local use_org choice
+  local -a orgs
+
+  orgs=("${(@f)$(gh api user/orgs --jq '.[].login' 2>/dev/null | sort -u)}")
+  selected_owner="$account"
+
+  if (( ${#orgs[@]} == 0 )); then
+    return
+  fi
+
+  echo ""
+  read "use_org?Use org? (y/N) "
+  case "${use_org:l}" in
+    y|yes)
+      if (( ${#orgs[@]} == 1 )); then
+        selected_owner="${orgs[1]}"
+        return
+      fi
+      ;;
+    ""|n|no) return ;;
+    *)
+      echo "Invalid selection"
+      exit 1
+      ;;
+  esac
+
+  echo "Organizations:"
+  for i in {1..${#orgs[@]}}; do
+    echo "  $i) ${orgs[$i]}"
+  done
+  echo ""
+  read "choice?Organization: "
+  if [[ -z "${orgs[$choice]}" ]]; then
+    echo "Invalid organization selection"
+    exit 1
+  fi
+
+  selected_owner="${orgs[$choice]}"
+}
+
 visibility="--private"
 for arg in "$@"; do
   case "$arg" in
@@ -10,9 +52,11 @@ for arg in "$@"; do
   esac
 done
 
+gh auth switch --user "$gh_user"
+choose_owner "$gh_user"
+
 if [[ " $* " == *" --existing "* ]]; then
-  gh auth switch --user "$gh_user"
-  all_repos=("${(@f)$(gh repo list "$gh_user" --limit 1000 --json name -q '[.[].name] | sort | .[]')}")
+  all_repos=("${(@f)$(gh repo list "$selected_owner" --limit 1000 --json name -q '[.[].name] | sort | .[]')}")
   read "search?Search: "
   repos=()
   for repo in "${all_repos[@]}"; do
@@ -32,20 +76,19 @@ if [[ " $* " == *" --existing "* ]]; then
   echo ""
   read "choice?> "
   repo_name="${repos[$choice]}"
-  echo "Connecting to ${gh_user}/${repo_name}"
+  echo "Connecting to ${selected_owner}/${repo_name}"
   read "confirm?Confirm? (y/n) "
   [[ "$confirm" != "y" ]] && exit 0
 
   git remote remove origin 2>/dev/null
-  git remote add origin "https://github.com/${gh_user}/${repo_name}.git"
+  git remote add origin "https://github.com/${selected_owner}/${repo_name}.git"
   git push -u origin main
 else
   read "repo_name?Repo name: "
-  local label=${visibility#--}
-  echo "Creating ${label} repo ${gh_user}/${repo_name}"
+  label=${visibility#--}
+  echo "Creating ${label} repo ${selected_owner}/${repo_name}"
   read "confirm?Confirm? (y/n) "
   [[ "$confirm" != "y" ]] && exit 0
 
-  gh auth switch --user "$gh_user"
-  gh repo create "${gh_user}/${repo_name}" --source=. $visibility --push
+  gh repo create "${selected_owner}/${repo_name}" --source=. $visibility --push
 fi
