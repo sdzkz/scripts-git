@@ -26,6 +26,7 @@ excluded_patterns = {
     "**/__pycache__/**",
     "venv/**",
     "brave/**",
+    "openclaw/**",
     "*-env/**",
     "Work/Misc/Archive/**",
     "Misc/lg-aristo/podcasts/library/**",
