@@ -6,6 +6,8 @@ BIN_DIR="$HOME/.local/bin"
 INSTALL_DIR="$HOME/.local/node"
 CURRENT_LINK="$INSTALL_DIR/current"
 DIST_URL="https://nodejs.org/dist"
+PLATFORM="darwin-arm64"
+INDEX_PLATFORM="osx-arm64-tar"
 
 normalize_version() {
   sed -E 's/^[^0-9]*//'
@@ -18,68 +20,6 @@ require_cmd() {
   fi
 }
 
-detect_asset_platform() {
-  case "$(uname -s)" in
-    Darwin)
-      os="darwin"
-      ;;
-    Linux)
-      os="linux"
-      ;;
-    *)
-      echo "Unsupported OS: $(uname -s)" >&2
-      exit 1
-      ;;
-  esac
-
-  case "$(uname -m)" in
-    arm64|aarch64)
-      arch="arm64"
-      ;;
-    x86_64|amd64)
-      arch="x64"
-      ;;
-    *)
-      echo "Unsupported architecture: $(uname -m)" >&2
-      exit 1
-      ;;
-  esac
-
-  print -r -- "${os}-${arch}"
-}
-
-detect_index_platform() {
-  case "$(uname -s)" in
-    Darwin)
-      os="osx"
-      suffix="-tar"
-      ;;
-    Linux)
-      os="linux"
-      suffix=""
-      ;;
-    *)
-      echo "Unsupported OS: $(uname -s)" >&2
-      exit 1
-      ;;
-  esac
-
-  case "$(uname -m)" in
-    arm64|aarch64)
-      arch="arm64"
-      ;;
-    x86_64|amd64)
-      arch="x64"
-      ;;
-    *)
-      echo "Unsupported architecture: $(uname -m)" >&2
-      exit 1
-      ;;
-  esac
-
-  print -r -- "${os}-${arch}${suffix}"
-}
-
 require_cmd curl
 require_cmd jq
 require_cmd shasum
@@ -87,8 +27,10 @@ require_cmd tar
 require_cmd xz
 mkdir -p "$BIN_DIR" "$INSTALL_DIR"
 
-PLATFORM="$(detect_asset_platform)"
-INDEX_PLATFORM="$(detect_index_platform)"
+if [[ "$(uname -s)" != "Darwin" || "$(uname -m)" != "arm64" ]]; then
+  echo "This updater is for Apple Silicon macOS only" >&2
+  exit 1
+fi
 
 latest_json=$(curl -fsSL "$DIST_URL/index.json")
 latest_tag=$(print -r -- "$latest_json" | jq -r 'map(select(.lts != false)) | .[0].version // empty')
