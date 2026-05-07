@@ -112,11 +112,14 @@ fi
 
 rm -rf "$install_path"
 mv "$extracted_dir" "$install_path"
+rm -f "$install_path/bin/npm" "$install_path/bin/npx" "$install_path/bin/corepack"
+rm -rf "$install_path/lib/node_modules/npm" "$install_path/lib/node_modules/corepack"
 ln -sfn "$install_path" "$CURRENT_LINK"
+ln -sfn "$CURRENT_LINK/bin/node" "$BIN_DIR/node"
 
-for executable in node npm npx corepack; do
-  if [[ -e "$CURRENT_LINK/bin/$executable" ]]; then
-    ln -sfn "$CURRENT_LINK/bin/$executable" "$BIN_DIR/$executable"
+for executable in npm npx corepack; do
+  if [[ -L "$BIN_DIR/$executable" && "$(readlink "$BIN_DIR/$executable")" == "$CURRENT_LINK/bin/$executable" ]]; then
+    rm -f "$BIN_DIR/$executable"
   fi
 done
 
