@@ -1,0 +1,181 @@
+#!/usr/bin/env zsh
+
+set -euo pipefail
+
+BIN_DIR="$HOME/.local/bin"
+INSTALL_DIR="$HOME/.local/node"
+CURRENT_LINK="$INSTALL_DIR/current"
+DIST_URL="https://nodejs.org/dist"
+
+normalize_version() {
+  sed -E 's/^[^0-9]*//'
+}
+
+require_cmd() {
+  if ! command -v "$1" >/dev/null 2>&1; then
+    echo "Missing required command: $1" >&2
+    exit 1
+  fi
+}
+
+detect_asset_platform() {
+  case "$(uname -s)" in
+    Darwin)
+      os="darwin"
+      ;;
+    Linux)
+      os="linux"
+      ;;
+    *)
+      echo "Unsupported OS: $(uname -s)" >&2
+      exit 1
+      ;;
+  esac
+
+  case "$(uname -m)" in
+    arm64|aarch64)
+      arch="arm64"
+      ;;
+    x86_64|amd64)
+      arch="x64"
+      ;;
+    *)
+      echo "Unsupported architecture: $(uname -m)" >&2
+      exit 1
+      ;;
+  esac
+
+  print -r -- "${os}-${arch}"
+}
+
+detect_index_platform() {
+  case "$(uname -s)" in
+    Darwin)
+      os="osx"
+      suffix="-tar"
+      ;;
+    Linux)
+      os="linux"
+      suffix=""
+      ;;
+    *)
+      echo "Unsupported OS: $(uname -s)" >&2
+      exit 1
+      ;;
+  esac
+
+  case "$(uname -m)" in
+    arm64|aarch64)
+      arch="arm64"
+      ;;
+    x86_64|amd64)
+      arch="x64"
+      ;;
+    *)
+      echo "Unsupported architecture: $(uname -m)" >&2
+      exit 1
+      ;;
+  esac
+
+  print -r -- "${os}-${arch}${suffix}"
+}
+
+require_cmd curl
+require_cmd jq
+require_cmd shasum
+require_cmd tar
+require_cmd xz
+mkdir -p "$BIN_DIR" "$INSTALL_DIR"
+
+PLATFORM="$(detect_asset_platform)"
+INDEX_PLATFORM="$(detect_index_platform)"
+
+latest_json=$(curl -fsSL "$DIST_URL/index.json")
+latest_tag=$(print -r -- "$latest_json" | jq -r 'map(select(.lts != false)) | .[0].version // empty')
+lts_name=$(print -r -- "$latest_json" | jq -r 'map(select(.lts != false)) | .[0].lts // empty')
+
+if [[ -z "$latest_tag" ]]; then
+  echo "Could not determine the latest LTS release" >&2
+  exit 1
+fi
+
+if ! print -r -- "$latest_json" | jq -e --arg version "$latest_tag" --arg platform "$INDEX_PLATFORM" '.[] | select(.version == $version) | .files | index($platform)' >/dev/null; then
+  echo "Latest LTS release $latest_tag does not provide $INDEX_PLATFORM" >&2
+  exit 1
+fi
+
+latest_version=$(print -r -- "$latest_tag" | normalize_version)
+asset="node-${latest_tag}-${PLATFORM}.tar.xz"
+url="$DIST_URL/${latest_tag}/${asset}"
+install_path="$INSTALL_DIR/${latest_tag}-${PLATFORM}"
+
+if [[ -x "$CURRENT_LINK/bin/node" ]]; then
+  current_raw=$("$CURRENT_LINK/bin/node" --version 2>/dev/null | head -1 || true)
+elif [[ -x "$BIN_DIR/node" ]]; then
+  current_raw=$("$BIN_DIR/node" --version 2>/dev/null | head -1 || true)
+else
+  current_raw=""
+fi
+
+current_version=$(print -r -- "$current_raw" | sed -E 's/.*v?([0-9]+\.[0-9]+\.[0-9]+).*/\1/')
+current_version=${current_version:-none}
+
+if [[ "$latest_version" == "$current_version" && -L "$CURRENT_LINK" ]]; then
+  echo "Already on $latest_tag"
+  exit 0
+fi
+
+echo "Updating: ${current_version} -> ${latest_tag} (${lts_name} LTS)"
+
+printf "Install ${latest_tag}? [y/N] "
+if ! read -r confirm; then
+  echo
+  echo "Update cancelled"
+  exit 0
+fi
+
+if [[ "$confirm" != [Yy]* ]]; then
+  echo "Update cancelled"
+  exit 0
+fi
+
+tmpdir=$(mktemp -d)
+trap 'rm -rf "$tmpdir"' EXIT
+
+curl -fsSL -o "$tmpdir/$asset" "$url"
+curl -fsSL -o "$tmpdir/SHASUMS256.txt" "$DIST_URL/${latest_tag}/SHASUMS256.txt"
+
+expected_digest=$(awk -v asset="$asset" '$2 == asset {print $1}' "$tmpdir/SHASUMS256.txt")
+if [[ -z "$expected_digest" ]]; then
+  echo "Could not determine the SHA-256 digest for $asset" >&2
+  exit 1
+fi
+
+actual_digest=$(shasum -a 256 "$tmpdir/$asset" | awk '{print $1}')
+if [[ "$actual_digest" != "$expected_digest" ]]; then
+  echo "Checksum verification failed for $asset" >&2
+  echo "Expected: $expected_digest" >&2
+  echo "Actual:   $actual_digest" >&2
+  exit 1
+fi
+
+echo "Verified checksum: sha256:$actual_digest"
+tar -xJf "$tmpdir/$asset" -C "$tmpdir"
+
+extracted_dir="$tmpdir/node-${latest_tag}-${PLATFORM}"
+if [[ ! -x "$extracted_dir/bin/node" ]]; then
+  echo "Could not find node binary in $asset" >&2
+  exit 1
+fi
+
+rm -rf "$install_path"
+mv "$extracted_dir" "$install_path"
+ln -sfn "$install_path" "$CURRENT_LINK"
+
+for executable in node npm npx corepack; do
+  if [[ -e "$CURRENT_LINK/bin/$executable" ]]; then
+    ln -sfn "$CURRENT_LINK/bin/$executable" "$BIN_DIR/$executable"
+  fi
+done
+
+echo "Updated to $latest_tag"
